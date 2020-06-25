@@ -38,7 +38,15 @@
  */
 #define MASK_ERASE        0x08 //
 #define MASK_LOCK_UNLOCK  0x04
+#define MASK_CLR_PWD      0x02
+#define MASK_SET_PWD      0x01
 
+/*
+ * Options for Types of SD cards.
+ */
+#define  SDTYPE_UNKNOWN		0				/* card type not determined */
+#define  SDTYPE_SD				1				/* SD v1 (1 MB to 2 GB) */
+#define  SDTYPE_SDHC			2				/* SDHC (4 GB to 32 GB) */
 /*
  * Arduino is split into blocks of pins. Each block needs 3 Registers
  * DDR (Data Direction Register) - Dictates which pins are Input or output
@@ -89,6 +97,12 @@
 uint8_t pwd[16];
 uint8_t pwd_len;
 uint8_t crctable[256];
+uint8_t sdtype;
+uint8_t block[512];
+uint8_t cardstatus[2];
+uint8_t csd[16];
+uint8_t cid[16];
+uint8_t ocr[4];
 
 /*
  * Local function declaration
@@ -96,14 +110,15 @@ uint8_t crctable[256];
 static void 	  Done(void);
 static void     Select(void);
 static void     Deselect(void);
-static uint8_t  xchg(uint8_t  c);
+static uint8_t  SendByte(uint8_t  c);
 static void     BuildCRCTable(void);
 static void 		LoadEnteredPassword(void);
 static uint8_t 	ExecuteCMD42(uint8_t mask);
 static void     ProcessCommand(void);
 static uint8_t  ReadCommand(void);
-static int8_t   sd_send_command(uint8_t  command, uint32_t  arg);
+static int8_t   SendCommand(uint8_t  command, uint32_t  arg);
 static int8_t		sd_wait_for_data(void);
+static int8_t   InitializeSD(void);
 
 
 int main(void) {
@@ -120,7 +135,7 @@ int main(void) {
    * Enabling SPI via SPCR (Serial Peripheral Control Register)
    * SPE  - SPI Enable - Flip bit to enable SPI
    * MSTR - Master/Slave Select. If set Master mode is enabled.
-   * SPR1 - Setting Clock Rate - Multiple options depending on SP
+   * SPR1 - Setting Clock Rate - Multiple options depending on SPX
    * SPR0 - Setting Clock Rate - SPR0, SPR1 and SPI2X dictate Clock Rate based on which bits are set.
    * In this configuration Clock Rate is set to fosc/128.
    */
@@ -153,22 +168,120 @@ static void ProcessCommand(void) {
   static uint8_t  prevCMD = 0;
   uint8_t         response;
 
-  response = ReadCommand();
+  cmd = ReadCommand();
 
-  if((cmd != prevCMD) && (prevCMD == CMD_NONE)) prevCMD = cmd;
+  if((cmd != prevCMD) && (prevCMD == CMD_NONE)) {
+
+  response = InitializeSD();
+  if(response != SD_OK) printf_P(PSTR("\n\r\n\rUnable to initialize card."));
+
+  // ToDo - Finish InitializeSD
+  }
+  prevCMD = cmd;
 }
 
 static uint8_t ReadCommand(void) {
-  uint8_t response, cmd;
+  uint8_t response;
 
   _delay_ms(50);
   response = CMD_NONE;
   if(uart_pending_data()) {
     response = getchar();
     printf_P(PSTR("\n%c"), response);
+
+    if (response == '?')       response = CMD_INFO;
+    else if (response == 'r')  response = CMD_READBLK;
+    else if (response == 'u')  response = CMD_PWD_UNLOCK;
+    else if (response == 'l')  response = CMD_PWD_LOCK;
+    else if (response == 'c')  response = CMD_PWD_CLEAR;
+    else ReadCommand();
   }
 
   return response;
+}
+
+static int8_t InitializeSD(void) {
+  int i;
+  int8_t response;
+
+  sdtype = SDTYPE_UNKNOWN;
+
+  Deselect();
+
+  // Send bytes while card stabilizes.
+  for(i=0; i < 10; i++) SendByte(0xff);
+
+  response = SendCommand(SD_IDLE, 0);
+  if(response == 1) printf_P(PSTR("\r\nSD is idling."));
+  else if(response != 1) return SD_NO_DETECT;
+
+  SendCommand(SD_SET_BLK, 512); // Set block length to 512 bytes.
+
+  // Always attempt ACMD41 first for SDC then drop to CMD1
+  response = SendCommand(SD_INTER, 0x1aa);
+
+  return SD_OK;
+}
+
+/*
+ * SendCommand
+ * Function accepts an SD CMD and 4 byte argument.
+ * Exchanges CMD and arg with CRC and 0xff filled bytes with card.
+ * Returns the response provided by the card.
+ * For advanced initilization and commands this will send the required preface CMD55
+ * Error codes will be 0xff for no response, 0x01 for OK, or CMD specific responses.
+ */
+static int8_t SendCommand(uint8_t cmd, uint32_t arg) {
+  uint8_t response, crc = 0x01;
+
+  // Needed for SDC and advanced initilization. Sending ACMD(n) as CMD55.
+  if(cmd & 0x80) {
+    cmd = cmd & 0x7f; // Stripping high bit.
+    response = SendCommand(CMD55, 0);
+    if (response > 1) return response;
+  }
+
+  Deselect();
+  SendByte(0xff);
+  Select();
+  SendByte(0xff);
+
+  /*
+   * Begin sending command
+   * Command structure is 48 bits??
+   */
+   SendByte(cmd | 0x40);
+   SendByte((unsigned char)(arg>>24));
+   SendByte((unsigned char)(arg>>16));
+   SendByte((unsigned char)(arg>>8));
+   SendByte((unsigned char)(arg&0xff));
+   if(cmd == SD_IDLE)  crc = 0x95;
+   if(cmd == SD_INTER) crc = 0x87;
+   SendByte(crc);
+
+   // Send clocks waiting for timeout.
+   do {
+     response = SendByte(0xff);
+   } while((response & 0x80) != 0); // High bit cleared means OK
+
+   // Deselecting card if no more R/W operations required.
+   switch (cmd) {
+     case SD_IDLE :
+        break;
+     case SD_INIT :
+        break;
+     case SD_SET_BLK :
+        break;
+     case CMD55 :
+        break;
+     case SD_ADV_INIT :
+        break;
+      default :
+        Deselect();
+        SendByte(0xff);
+   }
+
+   return response;
 }
 
 // Not sure how this is working....
@@ -188,7 +301,7 @@ static void BuildCRCTable(void) {
  * Flipping CS bit -- Selecting card.
  */
 static void Select(void) {
-  SD_PORT &= ~SD_CS_MASK; //
+  SD_PORT &= ~SD_CS_MASK;
 }
 
 /*
@@ -203,6 +316,12 @@ static void Deselect(void) {
  */
 static void Done(void) {
 	printf_P(PSTR("\ndone.\n"));
+}
+
+static unsigned char SendByte(unsigned char c) {
+  SPDR = c; // Write to SPI Data Register - Writes out to MOSI via Hosts SPI Bus
+  while((SPSR & (1<<SPIF)) == 0); // Wait for SPSR and SPIF registers to clear.
+  return SPDR;
 }
 
 // Get user input for an attempted password and then Load that password into memory.
@@ -249,27 +368,27 @@ static uint8_t ExecuteCMD42(uint8_t mask) {
 	Select(); // CMD7 Select the card. Place in Transfer/Receive mode.
 
 	// No need to set block size. BLK set in SDInit()
-	response = sd_send_command(SD_LOCK_UNLOCK, 0); // Send unlock command.
+	response = SendCommand(SD_LOCK_UNLOCK, 0); // Send unlock command.
 	if(response != 0) return SD_RWFAIL; // Check response.
 
-	xchg(0xfe);	// Data token marking start of block.
-	xchg(mask); // Start with the correct command.
-	xchg(pwd_len); // Send pwd length
+	SendByte(0xfe);	// Data token marking start of block.
+	SendByte(mask); // Start with the correct command.
+	SendByte(pwd_len); // Send pwd length
 
  	// Sending 1 full 512 byte block.
 	for(i = 0; i < 512; i++) {
 		if(i < pwd_len) {
 			printf_P(PSTR("\nExchaning Byte: %c"), pwd[i]);
-			xchg(pwd[i]);
-		} else xchg(0xff);
+			SendByte(pwd[i]);
+		} else SendByte(0xff);
 	}
 
 	// Closing with 2x 8 clocks
-	xchg(0xff);
-	xchg(0xff);
+	SendByte(0xff);
+	SendByte(0xff);
 
 	i = 0xffff;
-	while(!xchg(0xFF) && (--i)); // Waiting for card.
+	while(!SendByte(0xFF) && (--i)); // Waiting for card.
 
 	if(i) return SD_OK;
 	else return SD_RWFAIL;
