@@ -1,4 +1,4 @@
-# SDUnlocker
+# Muninn SD
 This is a recompiling of SDLocker-2.1.
 Compiled on `Ubuntu` with `avr-gcc` using `avr-libc` library.
 Features will be added slowly, as well as the removal of certain aspects
