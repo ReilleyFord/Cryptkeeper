@@ -2,6 +2,7 @@
 This is a fork of SDLocker-2.1.
 Compiled on `Ubuntu` with `avr-gcc` using `avr-libc` library.
 
+Muninn means Memory and was the name of one of Odin's ravens.
 Work in Progress.
 If you're not Reilley Ford. You should not be seeing this.
 
