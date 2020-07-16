@@ -1,6 +1,7 @@
 # Cryptkeeper
 This is a fork of SDLocker-2.1.  
 Compiled on `Ubuntu` with `avr-gcc` using `avr-libc` library.  
+Designed for ATMega328p, with a possible transition to ATTiny804    
 
 Work in Progress.  
 If you're not Reilley Ford. You should not be seeing this.  
