@@ -31,7 +31,6 @@
 #define CMD55          (0x40 + 55)  // Multi-byte preface command
 #define SD_OCR         (0x40 + 58)  // Read OCR
 #define SD_ADV_INIT    (0xc0 + 41)  // ACMD41 Advanced Initialization for SDHC
-#define SD_GET_CSD     (0x40 + 27)  // CMD27: Get CSD Block
 
 /*
  * Masks for CMD42 options
@@ -91,8 +90,6 @@
 #define  CMD_LOCK_CHECK	9
 #define  CMD_ERASE		  10
 #define  CMD_PWD_CLEAR  11
-
-#define  CRC7_POLY		0x89		/* polynomial used for CSD CRCs */
 
 uint8_t pwd[16];
 uint8_t pwd_len;
@@ -154,7 +151,7 @@ int main(void) {
   sei();  // Enable Global Interrupts
 
   printf_P(PSTR("%c[2J"), 27); // Send escape code to clear UART Terminal.
-  printf_P(PSTR("\r\nPolyphemus SD Card Tool\r\n"));
+  printf_P(PSTR("\r\nCryptkeeper SD Card Tool\r\n"));
   printf_P(PSTR("? - Read Card Status\r\n"));
   printf_P(PSTR("u - Attempt Unlock\r\n"));
   printf_P(PSTR("l - Lock\r\n"));
