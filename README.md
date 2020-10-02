@@ -18,7 +18,7 @@ etc requiring changes. The core CMD interaction remains the same.
 This program was writting in `C` and compiled via `AVR-GCC`. I have successfully built the code on a Windows 10  
 Machine via `WinAVR` as well as a Ubuntu VM via native `AVR-GCC`. Once the code is compiled to a `.hex` file it  
 is flashed to the chip mounted in an Arduino UNO via `avrdude`. Once the code is flashed and the chip is ready  
-I have been using `PuTTY` to connect to the arduino over a serial connection. This will start up the USART terminal  
+I have been using `PuTTY` to connect to the arduino over a serial connection. This will start up the `USART` terminal  
 and the program will begin. There are many other ways to set this up but for now this is how i've been running it. 
 The goal in the future is custom designed hardware to support this code. 
 
