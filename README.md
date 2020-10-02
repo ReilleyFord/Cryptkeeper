@@ -24,14 +24,14 @@ The goal in the future is custom designed hardware to support this code.
 
 ##### Credit #####
 UART source code is from Mika Tuupola here:  
-https://www.appelsiini.net/2011/simple-usart-with-avr-libc
-All credit for the UART code goes to Mika Tuupola
-
-The idea for this project came from the Original SDLocker 2 project here:
-http://www.seanet.com/~karllunt/sdlocker2.html
-
-Created by Reilley Ford
-
+https://www.appelsiini.net/2011/simple-usart-with-avr-libc  
+All credit for the UART code goes to Mika Tuupola  
+  
+The idea for this project came from the Original SDLocker 2 project here:  
+http://www.seanet.com/~karllunt/sdlocker2.html  
+  
+Created by Reilley Ford  
+  
 `Lice in a fur collar`  
 `Hide deep out of sight,`  
 `But the devil hides deeper`  
